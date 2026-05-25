@@ -11,7 +11,7 @@ def to_langchain_tool(tool: ModelTool):
         from langchain_core.tools import StructuredTool
     except ImportError:
         raise ImportError(
-            "langchain-core is required. Install with: pip install modelbridge[langchain]"
+            "langchain-core is required. Install with: pip install predikit[langchain]"
         )
 
     def _run(**kwargs) -> dict:

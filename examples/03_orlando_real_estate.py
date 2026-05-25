@@ -19,7 +19,7 @@ try:
 except ImportError:
     raise SystemExit("XGBoost not installed. Run: pip install modelbridge[xgboost]")
 
-from modelbridge import ModelTool, ToolRegistry
+from predikit import ModelTool, ToolRegistry
 
 # ---------------------------------------------------------------------------
 # 1. Synthetic Orlando dataset

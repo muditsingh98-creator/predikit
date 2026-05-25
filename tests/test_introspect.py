@@ -1,7 +1,7 @@
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LinearRegression, LogisticRegression
 
-from modelbridge.introspect import introspect
+from predikit.introspect import introspect
 
 
 def test_classifier_metadata():

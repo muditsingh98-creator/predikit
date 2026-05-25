@@ -13,7 +13,7 @@ try:
 except ImportError:
     raise SystemExit("XGBoost not installed. Run: pip install modelbridge[xgboost]")
 
-from modelbridge import ModelTool
+from predikit import ModelTool
 
 # 1. Train
 X, y = make_regression(n_samples=500, n_features=4, noise=10, random_state=42)

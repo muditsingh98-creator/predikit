@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
 
-from modelbridge import ModelTool, ToolRegistry
+from predikit import ModelTool, ToolRegistry
 
 
 class IrisInput(BaseModel):

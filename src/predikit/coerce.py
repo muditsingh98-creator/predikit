@@ -18,7 +18,7 @@ def coerce_value(value: Any, target_type: type) -> Any:
                 return True
             if low in _BOOL_FALSE:
                 return False
-            raise ValueError(f"Cannot interpret {value!r} as bool")
+            raise ValueError(f"Cannot interpret {value!r} as bool. Expected one of: true/false, yes/no, 1/0, on/off")
         return bool(value)
 
     if target_type is int:
@@ -40,6 +40,11 @@ def coerce_inputs(validated: BaseModel, meta: dict) -> list:
     if feature_names:
         missing = [f for f in feature_names if f not in data]
         if missing:
-            raise ValueError(f"Input schema is missing model features: {missing}")
+            raise ValueError(
+                f"Input schema is missing model features: {missing}. "
+                f"Field names in your Pydantic schema must exactly match the column names "
+                f"used during model training. "
+                f"Schema has: {list(data.keys())}, model expects: {feature_names}"
+            )
         return [data[f] for f in feature_names]
     return list(data.values())

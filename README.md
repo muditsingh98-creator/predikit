@@ -1,126 +1,198 @@
-# modelbridge
-Opensource contribution
+# predikit
 
-# modelbridge — v0.1 Build Spec
+Turn any trained scikit-learn or XGBoost model into an LLM-callable tool — auto-generated JSON schemas, typed I/O, zero boilerplate.
 
-**One-line pitch:** Turn any trained sklearn/XGBoost model into an LLM-callable tool with auto-generated schemas and typed I/O. Framework-agnostic.
+```python
+tool = ModelTool(model=clf, name="classify_iris", ...)
+tool.to_openai()              # OpenAI function schema, ready to pass to the API
+tool.invoke({"sqft": 2200})   # → {"price_usd": 370730}
+```
 
-**Problem it solves:** LLM agents can call functions, but wrapping ML models as agent tools means hand-writing JSON schemas, input validators, and output formatters every time. `modelbridge` does this automatically from the model's own metadata.
+## Install
 
----
+```bash
+pip install predikit
 
-## What it does (in 4 steps)
+# With XGBoost support
+pip install predikit[xgboost]
 
-1. **Wrap** — User passes a fitted model + a Pydantic input schema + a name/description to `ModelTool(...)`.
-2. **Introspect** — Library auto-extracts feature names, output type, and class labels from the model.
-3. **Export** — User calls `.to_openai()` or `.to_langchain()` to get a tool definition usable by any agent framework.
-4. **Invoke** — When the LLM calls the tool, `modelbridge` validates/coerces inputs, runs `.predict()`, and returns a typed dict.
+# With LangChain support
+pip install predikit[langchain]
+```
 
----
+## 30-second example
 
-## Core API surface (memorize this)
+```python
+from pydantic import BaseModel, Field
+from sklearn.datasets import load_iris
+from sklearn.linear_model import LogisticRegression
+from predikit import ModelTool
+
+# Train
+X, y = load_iris(return_X_y=True)
+clf = LogisticRegression(max_iter=200).fit(X, y)
+
+# Define what the LLM will pass in
+class IrisInput(BaseModel):
+    sepal_length: float = Field(description="Sepal length in cm")
+    sepal_width:  float = Field(description="Sepal width in cm")
+    petal_length: float = Field(description="Petal length in cm")
+    petal_width:  float = Field(description="Petal width in cm")
+
+# Wrap the model
+tool = ModelTool(
+    model=clf,
+    name="classify_iris",
+    description="Classify an iris flower: 0=setosa, 1=versicolor, 2=virginica.",
+    input_schema=IrisInput,
+    output_name="species",
+    output_description="Predicted species index",
+)
+
+# Get an OpenAI-ready schema
+import json
+print(json.dumps(tool.to_openai(), indent=2))
+
+# Call it directly
+tool.invoke({
+    "sepal_length": 5.1, "sepal_width": 3.5,
+    "petal_length": 1.4, "petal_width": 0.2,
+})
+# → {"species": 0}
+```
+
+## Core API
+
+### `ModelTool`
 
 ```python
 ModelTool(
-    model,                # fitted sklearn-compatible estimator
-    name: str,            # tool name the LLM sees
-    description: str,     # tool description the LLM sees
-    input_schema,         # Pydantic BaseModel describing inputs
-    output_name: str,     # key for the prediction in returned dict
+    model,               # fitted sklearn-compatible estimator
+    name: str,           # tool name the LLM sees
+    description: str,    # tool description the LLM sees
+    input_schema,        # Pydantic BaseModel describing inputs
+    output_name: str,    # key for the prediction in the returned dict
     output_description: str,
 )
-
-ModelTool methods:
-    .invoke(input_dict) -> dict          # validates, coerces, predicts
-    .to_openai() -> dict                 # OpenAI function-calling schema
-    .to_langchain() -> Tool              # LangChain Tool object
-    .to_callable() -> Callable           # plain typed Python function
-
-ToolRegistry([tool1, tool2, ...])
-    .to_openai() -> list[dict]
-    .to_langchain() -> list[Tool]
-    .get(name) -> ModelTool
 ```
 
-That's the entire public API. Five methods on `ModelTool`, three on `ToolRegistry`. Don't add more for v0.1.
+| Method | Returns | What it does |
+|--------|---------|--------------|
+| `.invoke(input_dict)` | `dict` | Validates → predicts → returns `{output_name: value}` |
+| `.to_openai()` | `dict` | OpenAI function-calling schema |
+| `.to_langchain()` | `StructuredTool` | LangChain tool |
+| `.to_callable()` | `Callable` | Plain Python function |
 
----
+### `ToolRegistry`
 
-## Folder structure
+Group multiple tools for bulk export:
 
-```
-modelbridge/
-├── pyproject.toml
-├── README.md, LICENSE (MIT), .gitignore
-├── .github/workflows/{test.yml, publish.yml}
-├── src/modelbridge/
-│   ├── __init__.py       # exports ModelTool, ToolRegistry
-│   ├── tool.py           # ModelTool class
-│   ├── registry.py       # ToolRegistry class
-│   ├── introspect.py     # extract metadata from sklearn models
-│   ├── coerce.py         # type coercion (str→float, etc.)
-│   └── exporters/{openai.py, langchain.py}
-├── tests/                # pytest, one file per module
-└── examples/
-    ├── 01_basic_sklearn.py
-    ├── 02_xgboost_regression.py
-    └── 03_orlando_real_estate.py    # your portfolio demo
+```python
+registry = ToolRegistry([price_tool, risk_tool])
+registry.to_openai()     # → list[dict], pass directly to OpenAI
+registry.to_langchain()  # → list[StructuredTool]
+registry.get("name")     # → ModelTool
 ```
 
----
+## Field naming rule
 
-## v0.1 scope — IN
+**Your Pydantic schema field names must exactly match the column names the model was trained on.**
 
-- [x] `ModelTool` wraps sklearn-compatible models (anything with `.predict` / `.predict_proba`)
-- [x] Auto-introspection: `feature_names_in_`, `classes_`, output dtype
-- [x] Pydantic input schemas with basic type coercion (str→int/float, bool parsing)
-- [x] Exporters: OpenAI function-calling JSON, LangChain Tool, plain callable
-- [x] `ToolRegistry` for bundling multiple tools
-- [x] Helpful errors when LLM hands you malformed inputs
-- [x] Tests on Python 3.10, 3.11, 3.12
-- [x] Working Orlando example
+predikit maps inputs to features by name, not position. If you trained on a DataFrame with columns `["sqft", "bedrooms"]`, your schema fields must be `sqft` and `bedrooms` — not `sq_ft`, not `Sqft`.
 
-## v0.1 scope — OUT (roadmap, mention in README)
+```python
+# ✓ Columns match: sqft, bedrooms, bathrooms
+class GoodInput(BaseModel):
+    sqft:      float
+    bedrooms:  float
+    bathrooms: float
 
-- [ ] Confidence-aware routing & fallback
-- [ ] Multi-model synthesis (agent calls several, reconciles)
-- [ ] MLflow / Snowflake Model Registry integration
-- [ ] HuggingFace / PyTorch / TensorFlow support
-- [ ] Async invocation
-- [ ] Streaming outputs
+# ✗ Name mismatch — raises ValueError at runtime
+class BadInput(BaseModel):
+    square_footage: float  # model expects "sqft"
+    beds:           float  # model expects "bedrooms"
+    baths:          float  # model expects "bathrooms"
+```
 
----
+When there's a mismatch, predikit tells you exactly which names are wrong:
 
-## Build order (do in this sequence)
+```
+ValueError: Input schema is missing model features: ['sqft', 'bedrooms'].
+Schema has: ['square_footage', 'beds', 'bathrooms'], model expects: ['sqft', 'bedrooms', 'bathrooms']
+```
 
-1. **Check PyPI name availability** — visit `pypi.org/project/modelbridge/`. First 404 wins.
-2. **Write the README** — design forced through docs. If the README isn't compelling, the API isn't right.
-3. **Stub `tool.py`** — signatures + docstrings, no implementation. Make sure it *reads* well.
-4. **Implement `introspect.py`** — pure function: model → metadata dict. Easy to test in isolation.
-5. **Implement `coerce.py`** — pure function: (value, target_type) → coerced value. Easy to test.
-6. **Implement `ModelTool.invoke()`** — ties introspect + coerce + predict together.
-7. **Implement exporters** — straightforward translations of metadata into framework formats.
-8. **Implement `ToolRegistry`** — thin wrapper, mostly delegation.
-9. **Write the Orlando example** — the README's hero demo. Must actually run.
-10. **Publish to TestPyPI first**, then real PyPI.
+> **Tip:** If you trained with a numpy array (no DataFrame), predikit has no feature names to check — it uses your schema's field definition order instead.
 
----
+## Cookbook
 
-## Definition of done for v0.1
+### XGBoost regression
 
-- `pip install modelbridge` works
-- README has a 30-second code example that runs as written
-- Orlando example in `examples/` runs end-to-end
-- ≥70% test coverage on `src/modelbridge/`
-- GitHub Actions runs tests on every PR
-- LinkedIn announcement post drafted
+```python
+from xgboost import XGBRegressor
+from predikit import ModelTool
 
----
+reg = XGBRegressor().fit(X_train, y_train)
 
-## Anti-scope (things that will tempt you — say no)
+class HouseInput(BaseModel):
+    sqft:       float
+    bedrooms:   float
+    year_built: float
 
-- Don't add an agent runtime. You wrap models; users bring their own agent loop.
-- Don't add model training helpers. You're a tooling library, not a modeling library.
-- Don't add a CLI. v0.1 is a Python API only.
-- Don't support every sklearn estimator edge case. Get the 80% case clean; document gaps.
-- Don't make it async. Sync is fine for v0.1.
+tool = ModelTool(
+    model=reg,
+    name="price_estimate",
+    description="Predict home price in USD.",
+    input_schema=HouseInput,
+    output_name="price_usd",
+    output_description="Predicted sale price in USD",
+)
+```
+
+### Multiple tools in one registry
+
+```python
+registry = ToolRegistry([price_tool, risk_tool, demand_tool])
+
+# OpenAI
+response = client.chat.completions.create(
+    model="gpt-4o",
+    tools=registry.to_openai(),
+    ...
+)
+
+# LangChain
+agent = initialize_agent(tools=registry.to_langchain(), ...)
+```
+
+### Bool inputs from an LLM
+
+LLMs sometimes return `"yes"`, `"true"`, or `"1"` for boolean fields. predikit coerces these automatically before Pydantic validation:
+
+```python
+class Input(BaseModel):
+    has_pool: bool
+
+tool.invoke({"has_pool": "yes"})   # → coerced to True
+tool.invoke({"has_pool": "false"}) # → coerced to False
+tool.invoke({"has_pool": "maybe"}) # → raises ValueError with clear message
+```
+
+Supported strings: `true/false`, `yes/no`, `1/0`, `on/off`.
+
+### Orlando real estate demo
+
+See [`examples/03_orlando_real_estate.py`](examples/03_orlando_real_estate.py) for a full end-to-end walkthrough: synthetic dataset → XGBoost training → `ModelTool` → registry → OpenAI schema → prediction.
+
+## Roadmap
+
+Intentionally out of scope for v0.1 — planned for later releases:
+
+- Confidence-aware routing & fallback
+- Multi-model synthesis (agent calls several, reconciles results)
+- MLflow / Snowflake Model Registry integration
+- HuggingFace / PyTorch / TensorFlow support
+- Async invocation
+
+## License
+
+MIT © Tejas Tumakuru Ashok

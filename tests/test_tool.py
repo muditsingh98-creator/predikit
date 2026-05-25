@@ -1,9 +1,10 @@
+import numpy as np
 import pytest
 from pydantic import BaseModel
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
 
-from modelbridge import ModelTool
+from predikit import ModelTool
 
 
 class IrisInput(BaseModel):
@@ -59,3 +60,25 @@ def test_output_is_native_python_type(iris_tool):
         {"sepal_length": 5.1, "sepal_width": 3.5, "petal_length": 1.4, "petal_width": 0.2}
     )
     assert isinstance(result["species"], int)
+
+
+def test_invoke_bool_string_coerced_through_invoke():
+    class FlagInput(BaseModel):
+        value: float
+        active: bool
+
+    X = np.array([[1.0, 0], [2.0, 1], [3.0, 0], [4.0, 1]])
+    y = np.array([0, 1, 0, 1])
+    clf = LogisticRegression().fit(X, y)
+
+    tool = ModelTool(
+        model=clf,
+        name="flag_test",
+        description="test bool coercion",
+        input_schema=FlagInput,
+        output_name="result",
+        output_description="predicted class",
+    )
+    assert tool.invoke({"value": 3.0, "active": "yes"})["result"] in [0, 1]
+    assert tool.invoke({"value": 1.0, "active": "false"})["result"] in [0, 1]
+    assert tool.invoke({"value": 3.0, "active": "on"})["result"] in [0, 1]

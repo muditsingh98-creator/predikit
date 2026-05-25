@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sklearn.datasets import load_iris
 from sklearn.linear_model import LogisticRegression
 
-from modelbridge import ModelTool
+from predikit import ModelTool
 
 # 1. Train
 X, y = load_iris(return_X_y=True)

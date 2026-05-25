@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel
 
-from modelbridge.coerce import coerce_inputs, coerce_value
+from predikit.coerce import coerce_inputs, coerce_value
 
 
 def test_coerce_bool_strings():
