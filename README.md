@@ -1,5 +1,9 @@
 # predikit
+# predikit
 [![PyPI version](https://img.shields.io/pypi/v/predikit.svg)](https://pypi.org/project/predikit/)
+[![Tests](https://github.com/Tejas-TA/predikit/actions/workflows/test.yml/badge.svg)](https://github.com/Tejas-TA/predikit/actions)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 
 Turn any trained scikit-learn or XGBoost model into an LLM-callable tool — auto-generated JSON schemas, typed I/O, zero boilerplate.
