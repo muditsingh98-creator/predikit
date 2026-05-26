@@ -1,5 +1,7 @@
 from .tool import ModelTool
 from .registry import ToolRegistry
+from .ensemble import ModelEnsemble
+from .exceptions import LowConfidenceError
 
-__all__ = ["ModelTool", "ToolRegistry"]
-__version__ = "0.1.0"
+__all__ = ["ModelTool", "ToolRegistry", "ModelEnsemble", "LowConfidenceError"]
+__version__ = "0.2.0"

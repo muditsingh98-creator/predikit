@@ -181,16 +181,77 @@ tool.invoke({"has_pool": "maybe"}) # → raises ValueError with clear message
 
 Supported strings: `true/false`, `yes/no`, `1/0`, `on/off`.
 
+### Confidence-aware routing
+
+Route uncertain predictions to a fallback tool, or raise an error the agent can catch:
+
+```python
+from predikit import ModelTool, LowConfidenceError
+
+tool = ModelTool(
+    model=clf,
+    name="churn_risk",
+    description="Predict member churn risk.",
+    input_schema=MemberInput,
+    output_name="churn_probability",
+    output_description="Probability of churn (0–1)",
+    confidence_threshold=0.80,       # classifiers with predict_proba only
+    on_low_confidence="warn",        # "warn" | "raise" | "fallback"
+    fallback_tool=rule_based_tool,   # used when mode="fallback"
+)
+
+result = tool.invoke(inputs)
+if result.get("_low_confidence"):
+    print(f"Uncertain ({result['_confidence']:.2f}) — consider routing to a human")
+```
+
+| mode | behaviour |
+|------|-----------|
+| `"warn"` | returns prediction + `_confidence` + `_low_confidence: True` |
+| `"raise"` | raises `LowConfidenceError` |
+| `"fallback"` | invokes `fallback_tool` and returns its result |
+
+Only applies to classifiers that implement `predict_proba`. Regressors are unaffected.
+
+### Multi-model ensemble
+
+Call multiple models and reconcile their outputs in one step:
+
+```python
+from predikit import ModelEnsemble, ToolRegistry
+
+ensemble = ModelEnsemble(
+    tools=[price_tool_a, price_tool_b],
+    name="averaged_price",
+    description="Ensemble price: mean of two XGBoost models.",
+    strategy="mean",              # "collect" | "mean" | "vote"
+)
+
+result  = ensemble.invoke(inputs)  # → {"price_usd": 370112}
+schema  = ensemble.to_openai()     # works exactly like ModelTool
+```
+
+| strategy | behaviour |
+|----------|-----------|
+| `"collect"` | merges all outputs into one dict (tools can have different `output_name`) |
+| `"mean"` | averages numeric outputs (all tools must share `output_name`) |
+| `"vote"` | majority class vote (all tools must share `output_name`) |
+
+Register ensembles alongside individual tools:
+
+```python
+registry = ToolRegistry(tools=[price_tool], ensembles=[ensemble])
+registry.to_openai()  # includes both tools and ensembles
+```
+
 ### Orlando real estate demo
 
 See [`examples/03_orlando_real_estate.py`](examples/03_orlando_real_estate.py) for a full end-to-end walkthrough: synthetic dataset → XGBoost training → `ModelTool` → registry → OpenAI schema → prediction.
 
 ## Roadmap
 
-Intentionally out of scope for v0.1 — planned for later releases:
+Planned for later releases:
 
-- Confidence-aware routing & fallback
-- Multi-model synthesis (agent calls several, reconciles results)
 - MLflow / Snowflake Model Registry integration
 - HuggingFace / PyTorch / TensorFlow support
 - Async invocation
