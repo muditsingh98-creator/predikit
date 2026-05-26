@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "predikit"
-version = "0.3.1"
+version = "0.3.3"
 description = "Turn any trained sklearn/XGBoost model into an LLM-callable tool with auto-generated schemas and typed I/O."
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.10"
 authors = [
-    {name = "Tejas Tumakuru Ashok", email = "tejas.tumakuruashok@travelandleisure.com"},
+    {name = "Tejas Tumakuru Ashok", email = "tejasta@gmail.com"},
 ]
 keywords = ["llm", "agents", "sklearn", "xgboost", "function-calling", "ml-tools"]
 classifiers = [

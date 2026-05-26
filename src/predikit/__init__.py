@@ -4,4 +4,4 @@ from .ensemble import ModelEnsemble
 from .exceptions import LowConfidenceError
 
 __all__ = ["ModelTool", "ToolRegistry", "ModelEnsemble", "LowConfidenceError"]
-__version__ = "0.3.2"
+__version__ = "0.3.3"
